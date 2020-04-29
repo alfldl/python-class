@@ -1,4 +1,5 @@
 import requests
+import cx_Oracle
 #   package   첫 글자가 대문자면 Class
 from bs4 import BeautifulSoup
 import csv
@@ -11,16 +12,6 @@ BASE_URL = 'http://www.pythonscraping.com'
 def create_list_from_table(table_tag):
     # CSV File로 만들기 위해 2중 List 생성
     gifts = []
-
-    # Header에 해당하는 첫번째 Row 작성
-    headers=[]
-    header_tag = table_tag.find('tr')
-    for th_tag in header_tag.find_all('th'):
-        # space등 제거
-        headers.append(th_tag.text.strip())
-
-    print('headers->', headers)
-    gifts.append(headers)
 
     # 본문 : 선물 record 작성
     for tr_tag in table_tag.find_all('tr'):
@@ -38,16 +29,28 @@ def create_list_from_table(table_tag):
             continue
 
         gifts.append(gift)
-    print('gifts->', gifts)
 
     return gifts
 
-def create_csv_file(gifts, filename):
-    with open(filename , 'w' , encoding='utf-8' , newline='') as file:
-        writer = csv.writer(file)
-        # gifts를 Line단위로
-        for line in gifts:
-            writer.writerow(line)
+def create_DB_file(gifts):
+    dsn = cx_Oracle.makedsn("localhost", 1521, "xe")
+    con = cx_Oracle.connect("scott", "tiger", dsn)
+    cursor = con.cursor()
+    cursor.execute("""SELECT COUNT(*) FROM tbl_gift""")
+    tot_cnt = cursor.fetchone()
+    tot_gift_cnt = tot_cnt[0]
+    print('tbl_gift 전체길이 --> %d ' % (tot_gift_cnt))
+    i = 0
+    # gifts를 Line단위로
+    for gift in gifts:
+        i = i + 1
+        cursor.execute('''INSERT INTO  tbl_gift(num , title , Description , cost,image ,  regDate ) 
+                        values (:v_num , :v_title     , :v_description ,     :v_cost        , :v_image,   sysdate ) ''',
+                                   v_num=i+tot_gift_cnt , v_title=gift[0],  v_description=gift[1], v_cost=gift[2] ,  v_image=gift[3]  )
+    con.commit()
+    con.close()
+
+    print('tbl_gift %d건  저장 완료 되었습니다 ' % i)
 
 
 def main():
@@ -61,9 +64,9 @@ def main():
     print("jtable_tag->%s" %table_tag)
      # 2. List 형태로 가져옴
     gifts = create_list_from_table(table_tag)
-    # 3. csv 형태의 file로 만듦
-    create_csv_file(gifts , 'gifts.csv')
-    print("csv Completed ...")
+    # 3. DB로 저장
+    create_DB_file(gifts)
+    print("DB save Completed ...")
     #print("table_tag->", table_tag)
 
 
