@@ -1,0 +1,1 @@
+driver.get("https://news.v.daum.net/v/20191124103713938?d=y")
